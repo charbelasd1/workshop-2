@@ -1,4 +1,6 @@
-# Cancer Prediction: Classification and Regression (Ready to Present)
+# workshop-2: Cancer Prediction (Classification & Regression)
+
+A Breast-Cancer Prediction Project
 
 This project builds a complete, reproducible pipeline on the Breast Cancer Wisconsin dataset to:
 - Classify tumors as malignant or benign.

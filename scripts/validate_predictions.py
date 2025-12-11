@@ -1,3 +1,15 @@
+"""
+Validation script for saved models.
+
+This utility loads the breast cancer dataset, evaluates predictions using
+the saved classifier and regressor artifacts, and writes:
+- `reports/validation.json` with summary metrics.
+- `reports/validation_classification_samples.csv` with example true vs pred.
+- `reports/validation_regression_samples.csv` with example true vs pred.
+
+Run it after training to produce validation artifacts used by the notebook.
+"""
+
 import os
 import json
 from pathlib import Path
@@ -23,6 +35,7 @@ REPORTS_DIR = "reports"
 
 
 def load_dataset():
+    """Load and rename the breast cancer dataset to match pipeline naming."""
     data = load_breast_cancer()
     df = pd.DataFrame(data.data, columns=data.feature_names)
     df["target"] = data.target
@@ -63,6 +76,11 @@ def load_dataset():
 
 
 def validate_classification(df: pd.DataFrame):
+    """Evaluate the saved classifier on a holdout split.
+
+    Returns a tuple of (metrics_dict, sample_dataframe) where the sample contains
+    a small set of true vs predicted labels.
+    """
     model_path = os.path.join(ARTIFACTS_DIR, "classifier_best.joblib")
     if not os.path.exists(model_path):
         raise FileNotFoundError("Classifier artifact not found. Train models first.")
@@ -105,6 +123,11 @@ def validate_classification(df: pd.DataFrame):
 
 
 def validate_regression(df: pd.DataFrame, target: str = "radius_mean"):
+    """Evaluate the saved regressor for a given target on a holdout split.
+
+    Returns a tuple of (metrics_dict, sample_dataframe) where the sample contains
+    a small set of true vs predicted values.
+    """
     model_path = os.path.join(ARTIFACTS_DIR, f"regressor_{target}_best.joblib")
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Regressor artifact for target '{target}' not found. Train models first.")
@@ -136,6 +159,7 @@ def validate_regression(df: pd.DataFrame, target: str = "radius_mean"):
 
 
 def main():
+    """Produce validation metrics and sample comparisons for both tasks."""
     Path(REPORTS_DIR).mkdir(exist_ok=True)
     df = load_dataset()
 

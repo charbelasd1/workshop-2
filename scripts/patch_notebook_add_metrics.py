@@ -1,3 +1,12 @@
+"""
+Append validation metrics cells to the notebook if missing.
+
+This script checks your `Breast_Cancer_Visualization_Preprocessing.ipynb` for a
+"Model Accuracy & Metrics" section and, if absent, appends markdown and code
+cells that read validation CSVs from `reports/` and print classification and
+regression metrics. Safe to run multiple times.
+"""
+
 import nbformat as nbf
 from pathlib import Path
 

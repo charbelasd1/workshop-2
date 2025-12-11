@@ -40,6 +40,9 @@ This project builds a complete, reproducible pipeline on the Breast Cancer Wisco
      ```
 
 4. Predict from a CSV (columns must match features):
+   You can use either the pipeline CLI or the dedicated prediction script.
+
+   - Using the pipeline CLI (no retraining when `--predict-file` is set):
    - Classification:
      ```bash
      python src/cancer_pipeline.py --task classification --predict-file path/to/unlabeled.csv
@@ -52,6 +55,25 @@ This project builds a complete, reproducible pipeline on the Breast Cancer Wisco
      ```bash
      python src/cancer_pipeline.py --task both --reg-target radius_mean --predict-file path/to/unlabeled.csv
      ```
+
+   - Using the simplified prediction script:
+     - Classification:
+       ```bash
+       python scripts/predict.py --task classification --csv data/sample_unlabeled.csv
+       ```
+     - Regression (example for `radius_mean`):
+       ```bash
+       python scripts/predict.py --task regression --reg-target radius_mean --csv data/sample_unlabeled.csv
+       ```
+     - Run both:
+       ```bash
+       python scripts/predict.py --task both --reg-target radius_mean --csv data/sample_unlabeled.csv
+       ```
+
+   Tips:
+   - Input CSV column names should be underscore style (e.g., `concave_points_mean`).
+   - See `data/sample_unlabeled.csv` for a ready-made schema.
+   - Outputs are saved under `reports/` with timestamps.
 
 Artifacts will be written to `reports/`, `reports/figures/`, and trained models to `artifacts/`.
 

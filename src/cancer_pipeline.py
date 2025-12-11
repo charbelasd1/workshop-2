@@ -1,3 +1,20 @@
+"""
+Training and Reporting Pipeline for Breast Cancer Dataset
+
+This module:
+- Loads and renames features from `sklearn.datasets.load_breast_cancer`.
+- Generates EDA figures (target distribution, correlation heatmap, pairplot).
+- Trains and evaluates classification models (LogReg, SVM, RandomForest).
+- Trains and evaluates regression models for selected continuous targets.
+- Saves metrics to `reports/metrics.json` and figures under `reports/figures/`.
+- Exposes a CLI to run training and optionally predict from an input CSV.
+
+Typical usage:
+- `python src/cancer_pipeline.py --task both` to produce artifacts and metrics.
+- `python src/cancer_pipeline.py --task classification` or `--task regression`.
+- Provide `--predict-file path/to.csv` to run inference with saved models.
+"""
+
 import os
 import json
 from pathlib import Path
@@ -29,11 +46,17 @@ from sklearn.svm import SVC
 
 
 def ensure_dirs():
+    """Create the reports directories if they do not exist."""
     Path("reports").mkdir(exist_ok=True)
     Path("reports/figures").mkdir(parents=True, exist_ok=True)
 
 
 def load_dataset():
+    """Load the breast cancer dataset and return a dataframe and the raw data.
+
+    Columns are renamed to underscore style to match common Kaggle naming
+    and to stay consistent with the UI and exporters.
+    """
     data = load_breast_cancer()
     df = pd.DataFrame(data.data, columns=data.feature_names)
     df["target"] = data.target
@@ -75,6 +98,12 @@ def load_dataset():
 
 
 def basic_eda(df: pd.DataFrame):
+    """Produce and save simple EDA visualizations.
+
+    - Target distribution bar chart.
+    - Correlation heatmap (mean features).
+    - Pairplot of selected mean features.
+    """
     # Target distribution
     target_counts = df["target"].value_counts()
     plt.figure(figsize=(4, 3))
@@ -104,6 +133,15 @@ def basic_eda(df: pd.DataFrame):
 
 
 def run_classification(df: pd.DataFrame):
+    """Train and evaluate several classifiers; save figures and return metrics.
+
+    Models:
+    - LogisticRegression with StandardScaler
+    - SVC (RBF kernel) with StandardScaler
+    - RandomForestClassifier
+
+    Returns a tuple: (metrics_dict, rf_feature_importances_df)
+    """
     X = df.drop(columns=["target"])  # use all features
     y = df["target"]
 
@@ -199,6 +237,14 @@ def run_classification(df: pd.DataFrame):
 
 
 def run_regression(df: pd.DataFrame, target: str = "radius_mean"):
+    """Train and evaluate regressors to predict a continuous feature.
+
+    - Excludes `target` and `target` label from inputs.
+    - Evaluates LinearRegression and RandomForestRegressor.
+    - Saves a residuals plot for the best model by R².
+
+    Returns a dict of metrics per model.
+    """
     # Predict a continuous feature (e.g., radius_mean) from all other features
     feature_cols = [c for c in df.columns if c != "target" and c != target]
     X = df[feature_cols]
@@ -243,6 +289,7 @@ def run_regression(df: pd.DataFrame, target: str = "radius_mean"):
 
 
 def main():
+    """End-to-end run producing EDA, training, evaluation, and metrics JSON."""
     ensure_dirs()
     df, data = load_dataset()
 
@@ -286,10 +333,18 @@ from datetime import datetime
 
 
 def ensure_artifacts_dir():
+    """Create the `artifacts` directory used to store trained models."""
     Path("artifacts").mkdir(exist_ok=True)
 
 
 def train_best_classification_model(df: pd.DataFrame):
+    """Train candidate classifiers and persist the best-performing model.
+
+    Chooses the best by ROC-AUC if available; otherwise falls back to F1.
+    Saves the model to `artifacts/classifier_best.joblib`.
+
+    Returns: (best_name, best_score, fitted_model)
+    """
     X = df.drop(columns=["target"])  # use all features
     y = df["target"]
     X_train, X_test, y_train, y_test = train_test_split(
@@ -320,6 +375,13 @@ def train_best_classification_model(df: pd.DataFrame):
 
 
 def train_best_regression_model(df: pd.DataFrame, target: str):
+    """Train candidate regressors for `target` and save the best model.
+
+    Evaluates models by R² score and saves the best to
+    `artifacts/regressor_{target}_best.joblib`.
+
+    Returns: (best_name, best_score, fitted_model, saved_model_path)
+    """
     features = [c for c in df.columns if c != "target" and c != target]
     X = df[features]
     y = df[target]
@@ -342,6 +404,14 @@ def train_best_regression_model(df: pd.DataFrame, target: str):
 
 
 def predict_from_csv(model_path: str, csv_path: str, task: str, target: str | None, df_template: pd.DataFrame):
+    """Load a model and run predictions on a CSV file.
+
+    - `task` controls classification vs regression feature selection.
+    - Ensures the CSV has the required columns, then saves predictions to
+      `reports/predictions_{task}_{timestamp}.csv`.
+
+    Returns the path to the saved predictions file.
+    """
     df_new = pd.read_csv(csv_path)
     # Build feature list based on template
     if task == "classification":
@@ -365,6 +435,15 @@ def predict_from_csv(model_path: str, csv_path: str, task: str, target: str | No
 
 
 def cli_main():
+    """Command-line entry point.
+
+    Args:
+    - `--task`: classification, regression, or both.
+    - `--reg-target`: target feature for regression (default `radius_mean`).
+    - `--predict-file`: optional CSV to run inference on.
+
+    Produces EDA, trains models, writes metrics, and optionally runs predictions.
+    """
     parser = argparse.ArgumentParser(description="Cancer Prediction: classification and regression")
     parser.add_argument("--task", choices=["classification", "regression", "both"], default="both",
                         help="Which task to run")
@@ -382,12 +461,13 @@ def cli_main():
     if args.predict_file is None or args.task == "both":
         basic_eda(df)
 
-    if args.task in ("classification", "both"):
+    # Train models only if not doing standalone predictions
+    if args.predict_file is None and args.task in ("classification", "both"):
         print("Training classification models and selecting best...")
         best_name, best_score, best_model = train_best_classification_model(df)
         print(f"Best classifier: {best_name} (score={best_score:.4f}) → saved at artifacts/classifier_best.joblib")
 
-    if args.task in ("regression", "both"):
+    if args.predict_file is None and args.task in ("regression", "both"):
         target = args.reg_target
         print(f"Training regression models for target '{target}' and selecting best...")
         best_name, best_score, best_model, out_path = train_best_regression_model(df, target)
